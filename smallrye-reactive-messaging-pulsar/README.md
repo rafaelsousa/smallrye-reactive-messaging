@@ -12,7 +12,7 @@ This will get pulsar and pulsar admin containers running
     cd src/test/pulsar-cluster
     docker-compose up -d
 
-Give some time to the containers to start. Then set up initial admin running:
+Give some time to the containers to start. Then set up initial admin user and its password:
 
     ./setadmin.sh
 
