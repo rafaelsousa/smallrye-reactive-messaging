@@ -41,10 +41,8 @@ public class PulsarTestBase {
     @Before
     public void setup() {
         try {
-//            Integer brokerPort = pulsarContainer.getMappedPort(BROKER_PORT);
-//            Integer restPort = pulsarContainer.getMappedPort(BROKER_HTTP_PORT);
-            Integer brokerPort = BROKER_PORT;
-            Integer restPort = BROKER_HTTP_PORT;
+            Integer brokerPort = pulsarContainer.getMappedPort(BROKER_PORT);
+            Integer restPort = pulsarContainer.getMappedPort(BROKER_HTTP_PORT);
             final String socketUrl = "pulsar://localhost:" + brokerPort;
             final String restUrl = "http://localhost:" + restPort;
 
