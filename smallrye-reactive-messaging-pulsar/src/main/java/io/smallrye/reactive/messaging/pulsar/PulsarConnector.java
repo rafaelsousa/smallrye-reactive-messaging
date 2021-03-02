@@ -25,7 +25,7 @@ import io.vertx.mutiny.core.Vertx;
 @Connector(PulsarConnector.CONNECTOR_NAME)
 public class PulsarConnector implements IncomingConnectorFactory, OutgoingConnectorFactory {
 
-    static final String CONNECTOR_NAME = "smallrye-pulsar";
+    public static final String CONNECTOR_NAME = "smallrye-pulsar";
     private static final Logger LOGGER = LoggerFactory.getLogger(PulsarConnector.class);
 
     @Inject

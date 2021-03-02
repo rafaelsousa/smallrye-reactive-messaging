@@ -1,93 +1,65 @@
 package io.smallrye.reactive.messaging.pulsar;
 
-import java.util.Collections;
-import java.util.HashSet;
+import org.eclipse.microprofile.config.Config;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.jboss.weld.environment.se.Weld;
+import org.jboss.weld.environment.se.WeldContainer;
+import org.junit.After;
+import org.junit.Before;
 
-import org.apache.pulsar.client.admin.PulsarAdmin;
-import org.apache.pulsar.client.admin.PulsarAdminException;
-import org.apache.pulsar.client.api.*;
-import org.apache.pulsar.common.policies.data.TenantInfo;
-import org.junit.*;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
+import io.smallrye.config.SmallRyeConfigProviderResolver;
+import io.smallrye.config.inject.ConfigExtension;
+import io.smallrye.reactive.messaging.MediatorFactory;
+import io.smallrye.reactive.messaging.connectors.ExecutionHolder;
+import io.smallrye.reactive.messaging.connectors.WorkerPoolRegistry;
+import io.smallrye.reactive.messaging.extension.ChannelProducer;
+import io.smallrye.reactive.messaging.extension.HealthCenter;
+import io.smallrye.reactive.messaging.extension.MediatorManager;
+import io.smallrye.reactive.messaging.extension.ReactiveMessagingExtension;
+import io.smallrye.reactive.messaging.impl.ConfiguredChannelFactory;
+import io.smallrye.reactive.messaging.impl.InternalChannelRegistry;
+import io.smallrye.reactive.messaging.pulsar.utils.PulsarConfigProvider;
+import io.smallrye.reactive.messaging.wiring.Wiring;
 
 public class PulsarTestBase {
 
-    private static final Integer BROKER_PORT = 6650;
-    private static final Integer BROKER_HTTP_PORT = 8080;
-    private static final String METRICS_ENDPOINT = "/metrics";
+    protected Weld weld;
 
-    private PulsarClient client;
-    private Producer<String> producer;
-    private Consumer<String> consumer;
-
-    @ClassRule
-    public static GenericContainer pulsarContainer = new GenericContainer("apachepulsar/pulsar")
-            .withExposedPorts(BROKER_PORT, BROKER_HTTP_PORT)
-            .withCommand("/pulsar/bin/pulsar", "standalone")
-            .waitingFor(Wait.forHttp(METRICS_ENDPOINT)
-                    .forStatusCode(200)
-                    .forPort(BROKER_HTTP_PORT));
-
-    @Test
-    public void testContainer() {
-        Assert.assertNotNull(pulsarContainer);
-    }
-
-    private TenantInfo getGeneralTenantInfo(PulsarAdmin pulsarAdmin) throws PulsarAdminException {
-        return new TenantInfo(new HashSet<>(Collections.emptyList()), new HashSet<>(pulsarAdmin.clusters().getClusters()));
-    }
+    protected WeldContainer weldContainer;
 
     @Before
-    public void setup() {
-        try {
-            Integer brokerPort = pulsarContainer.getMappedPort(BROKER_PORT);
-            Integer restPort = pulsarContainer.getMappedPort(BROKER_HTTP_PORT);
-            final String socketUrl = "pulsar://localhost:" + brokerPort;
-            final String restUrl = "http://localhost:" + restPort;
+    public void initializeWeld() {
+        SmallRyeConfigProviderResolver.instance().releaseConfig(ConfigProvider.getConfig());
+        weld = new Weld();
 
-            client = PulsarClient.builder()
-                    .serviceUrl(socketUrl)
-                    .build();
+        // SmallRye config
+        ConfigExtension extension = new ConfigExtension();
+        weld.addExtension(extension);
+        weld.addBeanClass(MediatorFactory.class);
+        weld.addBeanClass(Config.class);
+        weld.addBeanClass(MediatorManager.class);
+        weld.addBeanClass(InternalChannelRegistry.class);
+        weld.addBeanClass(ConfiguredChannelFactory.class);
+        weld.addBeanClass(ChannelProducer.class);
+        weld.addBeanClass(ExecutionHolder.class);
+        weld.addBeanClass(WorkerPoolRegistry.class);
+        weld.addBeanClass(HealthCenter.class);
+        weld.addBeanClass(Wiring.class);
+        weld.addExtension(new ReactiveMessagingExtension());
+        weld.addBeanClass(PulsarConfigProvider.class);
 
-            PulsarAdmin admin = PulsarAdmin
-                    .builder()
-                    .serviceHttpUrl(restUrl)
-                    .allowTlsInsecureConnection(true)
-                    .build();
+        weld.disableDiscovery();
 
-            admin.tenants().createTenant("smallrye-tenant", getGeneralTenantInfo(admin));
-            admin.namespaces().createNamespace("smallrye-tenant/smallrye-namespace/");
-            admin.topics().createNonPartitionedTopic("smallrye-tenant/smallrye-namespace/smallrye-topic");
-
-            producer = client.newProducer(Schema.STRING)
-                    .topic("test-tenant/test-namespace/test-topic")
-                    .create();
-
-            consumer = client.newConsumer(Schema.STRING)
-                    .topic("test-tenant/test-namespace/test-topic")
-                    .subscriptionName("my-subscription")
-                    .subscribe();
-
-        } catch (PulsarClientException e) {
-            Assert.fail("could not create pulsar client");
-        } catch (PulsarAdminException e) {
-            Assert.fail("could not create pulsar topic");
-        }
+        weldContainer = weld.initialize();
 
     }
 
     @After
-    public void tearDown() throws InterruptedException {
-
-    }
-
-    @Test
-    public void consumeMessage() {
-        try {
-
-        } catch (Exception e) {
-            Assert.fail("could not create producer");
+    public void cleanUp() {
+        if (weldContainer != null) {
+            weldContainer.shutdown();
         }
+        SmallRyeConfigProviderResolver.instance().releaseConfig(ConfigProvider.getConfig());
     }
+
 }
